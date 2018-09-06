@@ -87,6 +87,11 @@ MeshDisplayCustom::MeshDisplayCustom()
       QString::fromStdString(ros::message_traits::datatype<sensor_msgs::Image>()),
       "Image topic to subscribe to.",
       this, SLOT(updateDisplayImages()));
+
+  flag_topic_property_ = new RosTopicProperty("Flag Topic", "",
+      QString::fromStdString(ros::message_traits::datatype<std_msgs::Bool>()),
+      "Flag topic to subscribe to.",
+      this, SLOT(updateDisplayFlag()));
   // TODO(lucasw) add controls to switch which plane to align to?
   tf_frame_property_ = new TfFrameProperty("Quad Frame", "map",
       "Align the image quad to the xy plane of this tf frame",
@@ -94,6 +99,10 @@ MeshDisplayCustom::MeshDisplayCustom()
 
   meters_per_pixel_property_ = new FloatProperty("Meters per pixel", 0.002,
       "Rviz meters per image pixel.", this);
+
+  // flag_sub_ = nh_.subscribe("/flag", 1, &MeshDisplayCustom::updateFlag, this);
+
+
 }
 
 MeshDisplayCustom::~MeshDisplayCustom()
@@ -380,6 +389,12 @@ void MeshDisplayCustom::updateImage(const sensor_msgs::Image::ConstPtr& image)
   new_image_ = true;
 }
 
+void MeshDisplayCustom::updateFlag(const std_msgs::Bool::ConstPtr& msg)
+{
+  flag_ = msg->data;
+  setEnabled(flag_);
+}
+
 void MeshDisplayCustom::updateMeshProperties()
 {
   {
@@ -416,6 +431,12 @@ void MeshDisplayCustom::updateDisplayImages()
   subscribe();
 }
 
+void MeshDisplayCustom::updateDisplayFlag()
+{
+  unsubscribe_flag();
+  subscribe_flag();
+}
+
 void MeshDisplayCustom::subscribe()
 {
   if (!isEnabled())
@@ -438,9 +459,36 @@ void MeshDisplayCustom::subscribe()
   }
 }
 
+void MeshDisplayCustom::subscribe_flag()
+{
+  if (!isEnabled())
+  {
+    return;
+  }
+
+  if (!flag_topic_property_->getTopic().isEmpty())
+  {
+    try
+    {
+      flag_sub_ = nh_.subscribe(flag_topic_property_->getTopicStd(),
+          1, &MeshDisplayCustom::updateFlag, this);
+      setStatus(StatusProperty::Ok, "Display Flag Topic", "ok");
+    }
+    catch (ros::Exception& e)
+    {
+      setStatus(StatusProperty::Error, "Display Flag Topic", QString("Error subscribing: ") + e.what());
+    }
+  }
+}
+
 void MeshDisplayCustom::unsubscribe()
 {
   image_sub_.shutdown();
+}
+
+void MeshDisplayCustom::unsubscribe_flag()
+{
+  flag_sub_.shutdown();
 }
 
 void MeshDisplayCustom::load()
